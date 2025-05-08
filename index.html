@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinity Runner</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Подключаем Phaser через CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <!-- Telegram Mini Apps API -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div id="game-container"></div>
+
+<!-- Файл физических констант должен загружаться первым -->
+<script src="js/PhysicsConstants.js"></script>
+
+<!-- Подключаем игровые классы и объекты -->
+<script src="js/objects/Player.js"></script>
+<script src="js/objects/Obstacle.js"></script>
+
+<!-- Подключаем сцены -->
+<script src="js/scenes/MenuScene.js"></script>
+<script src="js/scenes/GameScene.js"></script>
+<script src="js/scenes/GameOverScene.js"></script>
+
+<!-- Основной скрипт игры -->
+<script src="js/main.js"></script>
+</body>
+</html>
