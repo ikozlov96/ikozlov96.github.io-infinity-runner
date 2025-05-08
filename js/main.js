@@ -3,6 +3,7 @@ let tgApp;
 try {
     tgApp = window.Telegram.WebApp;
     tgApp.expand(); // Расширяем на весь экран
+    console.log('Telegram WebApp инициализирован');
 } catch (e) {
     console.log('Telegram WebApp не обнаружен, запуск в обычном режиме');
 }
@@ -13,9 +14,34 @@ if (!window.Telegram) {
         WebApp: {
             expand: () => console.log('Заглушка для Telegram.WebApp.expand'),
             isExpanded: true,
-            CloudStorage: null
+            CloudStorage: null,
+            MainButton: {
+                show: () => console.log('MainButton.show заглушка'),
+                hide: () => console.log('MainButton.hide заглушка'),
+                setText: () => console.log('MainButton.setText заглушка'),
+                onClick: () => console.log('MainButton.onClick заглушка')
+            },
+            BackButton: {
+                show: () => console.log('BackButton.show заглушка'),
+                hide: () => console.log('BackButton.hide заглушка'),
+                onClick: () => console.log('BackButton.onClick заглушка')
+            }
         }
     }
+}
+
+// Функция инициализации пользователя Telegram
+// Перемещена перед использованием в gameData
+function initTelegramUser() {
+    if (tgApp && tgApp.initDataUnsafe) {
+        const user = tgApp.initDataUnsafe.user;
+        if (user) {
+            // Можно сохранять прогресс под ID пользователя
+            console.log(`Telegram User: ${user.first_name} (ID: ${user.id})`);
+            return user.id;
+        }
+    }
+    return 'local_user'; // Для локального тестирования
 }
 
 // Конфигурация игры с использованием физических констант
@@ -27,8 +53,8 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            // Используем реальную гравитацию, переведенную в игровые единицы
-            gravity: {y: PhysicsConstants.convertToGameUnits(PhysicsConstants.WORLD.GRAVITY)},
+            // Используем гравитацию из физических констант
+            gravity: {y: PhysicsConstants.WORLD.GRAVITY},
             debug: false
         }
     },
@@ -41,6 +67,7 @@ const config = {
 
 // Глобальные переменные игры
 const gameData = {
+    userId: initTelegramUser(),
     score: 0,
     highScore: 0,
     coins: 0,
@@ -52,20 +79,49 @@ const gameData = {
     },
     // Загрузка сохранений
     loadProgress: function () {
-        try {
-            const savedData = localStorage.getItem('infinityRunnerProgress');
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                this.highScore = parsedData.highScore || 0;
-                this.coins = parsedData.coins || 0;
-                this.upgrades = parsedData.upgrades || {
-                    jumpHeight: 1,
-                    speed: 1,
-                    coinMultiplier: 1
-                };
+        let loaded = false;
+
+        // Пытаемся загрузить из Telegram Cloud
+        if (tgApp && tgApp.CloudStorage) {
+            try {
+                tgApp.CloudStorage.getItem('infinityRunnerProgress')
+                    .then(value => {
+                        if (value) {
+                            const parsedData = JSON.parse(value);
+                            this.highScore = parsedData.highScore || 0;
+                            this.coins = parsedData.coins || 0;
+                            this.upgrades = parsedData.upgrades || {
+                                jumpHeight: 1,
+                                speed: 1,
+                                coinMultiplier: 1
+                            };
+                            loaded = true;
+                            console.log('Прогресс загружен из облака Telegram');
+                        }
+                    })
+                    .catch(e => console.error('Ошибка загрузки из облака Telegram:', e));
+            } catch (e) {
+                console.error('Ошибка при попытке загрузить из облака Telegram:', e);
             }
-        } catch (e) {
-            console.error('Ошибка загрузки прогресса:', e);
+        }
+
+        // Если не получилось из Telegram или прогресс еще не загружен, пробуем из localStorage
+        if (!loaded) {
+            try {
+                const savedData = localStorage.getItem('infinityRunnerProgress');
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    this.highScore = parsedData.highScore || 0;
+                    this.coins = parsedData.coins || 0;
+                    this.upgrades = parsedData.upgrades || {
+                        jumpHeight: 1,
+                        speed: 1,
+                        coinMultiplier: 1
+                    };
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки прогресса из localStorage:', e);
+            }
         }
     },
     // Сохранение прогресса
@@ -78,9 +134,11 @@ const gameData = {
             };
             localStorage.setItem('infinityRunnerProgress', JSON.stringify(dataToSave));
 
-            // Если есть Telegram Mini Apps, можно сохранить в облачное хранилище
+            // Если есть Telegram Mini Apps, сохраняем в облачное хранилище с обработкой ошибок
             if (tgApp && tgApp.CloudStorage) {
-                tgApp.CloudStorage.setItem('infinityRunnerProgress', JSON.stringify(dataToSave));
+                tgApp.CloudStorage.setItem('infinityRunnerProgress', JSON.stringify(dataToSave))
+                    .then(() => console.log('Прогресс сохранен в облаке Telegram'))
+                    .catch(e => console.error('Ошибка сохранения в облаке Telegram:', e));
             }
         } catch (e) {
             console.error('Ошибка сохранения прогресса:', e);
@@ -99,6 +157,23 @@ window.addEventListener('load', () => {
     // Делаем глобальные данные доступными для сцен
     game.registry.set('gameData', gameData);
     game.registry.set('physicsConstants', PhysicsConstants);
+
+    // Настройка кнопки "Назад" в Telegram
+    if (tgApp && tgApp.BackButton) {
+        tgApp.BackButton.hide(); // По умолчанию скрыта
+
+        // Слушатель события по изменению сцены
+        game.events.on('changedata-currentScene', (parent, value) => {
+            if (value === 'MenuScene') {
+                tgApp.BackButton.hide();
+            } else {
+                tgApp.BackButton.show();
+                tgApp.BackButton.onClick(() => {
+                    game.scene.start('MenuScene');
+                });
+            }
+        });
+    }
 
     // Обработчик изменения размера окна
     window.addEventListener('resize', () => {

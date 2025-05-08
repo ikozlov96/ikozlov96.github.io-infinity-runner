@@ -13,6 +13,30 @@ class GameOverScene extends Phaser.Scene {
         // Получаем данные игры из реестра
         this.gameData = this.registry.get('gameData');
 
+        // Настройка кнопок Telegram
+        if (tgApp) {
+            if (tgApp.MainButton) tgApp.MainButton.hide();
+            if (tgApp.BackButton) {
+                tgApp.BackButton.show();
+                tgApp.BackButton.onClick(() => {
+                    this.scene.start('MenuScene');
+                });
+            }
+
+            // Устанавливаем текущую сцену для системы навигации
+            this.registry.set('currentScene', 'GameOverScene');
+
+            // Отправка результата игры в нативный Telegram
+            if (tgApp.sendData) {
+                const gameResult = JSON.stringify({
+                    score: this.score,
+                    coins: this.coins,
+                    type: 'game_result'
+                });
+                tgApp.sendData(gameResult);
+            }
+        }
+
         // Фон
         this.add.rectangle(0, 0, this.cameras.main.width, this.cameras.main.height, 0x121212)
             .setOrigin(0, 0);
@@ -75,6 +99,21 @@ class GameOverScene extends Phaser.Scene {
             this.scene.start('GameScene');
         });
 
+        // Интеграция с MainButton Telegram для кнопки "Играть снова"
+        if (tgApp && tgApp.MainButton) {
+            replayButton.on('pointerover', () => {
+                tgApp.MainButton.setText('ИГРАТЬ СНОВА');
+                tgApp.MainButton.show();
+                tgApp.MainButton.onClick(() => {
+                    this.scene.start('GameScene');
+                });
+            });
+
+            replayButton.on('pointerout', () => {
+                tgApp.MainButton.hide();
+            });
+        }
+
         // Кнопка "В главное меню"
         const menuButton = this.add.rectangle(
             this.cameras.main.centerX,
@@ -95,8 +134,76 @@ class GameOverScene extends Phaser.Scene {
             this.scene.start('MenuScene');
         });
 
+        // Интеграция с MainButton Telegram для кнопки "В меню"
+        if (tgApp && tgApp.MainButton) {
+            menuButton.on('pointerover', () => {
+                tgApp.MainButton.setText('В МЕНЮ');
+                tgApp.MainButton.show();
+                tgApp.MainButton.onClick(() => {
+                    this.scene.start('MenuScene');
+                });
+            });
+        }
+
         // Проверка на то, хватает ли монет для улучшений
         this.checkForUpgrades();
+
+        // Предложение поделиться результатом в Telegram
+        if (tgApp && this.score > 10) {
+            this.createShareButton();
+        }
+    }
+
+    createShareButton() {
+        // Кнопка "Поделиться"
+        const shareButton = this.add.rectangle(
+            this.cameras.main.centerX,
+            this.cameras.main.height - 80,
+            200,
+            60,
+            0x0088cc // Цвет Telegram
+        ).setInteractive();
+
+        this.add.text(this.cameras.main.centerX, this.cameras.main.height - 80, 'ПОДЕЛИТЬСЯ', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '24px',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        // Обработчик для кнопки "Поделиться"
+        shareButton.on('pointerdown', () => {
+            this.shareResult();
+        });
+
+        // Интеграция с кнопками Telegram
+        if (tgApp && tgApp.MainButton) {
+            shareButton.on('pointerover', () => {
+                tgApp.MainButton.setText('ПОДЕЛИТЬСЯ');
+                tgApp.MainButton.show();
+                tgApp.MainButton.onClick(() => {
+                    this.shareResult();
+                });
+            });
+        }
+    }
+
+    shareResult() {
+        if (tgApp) {
+            if (tgApp.switchInlineQuery) {
+                // Для ботов, поддерживающих inline режим
+                const shareText = `Мой результат в Infinity Runner: ${this.score} очков и ${this.coins} монет! Попробуй побить мой рекорд!`;
+                tgApp.switchInlineQuery(shareText, ['users', 'groups', 'channels']);
+            } else {
+                // Альтернативный вариант - открыть диалог шаринга
+                const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`Мой результат в Infinity Runner: ${this.score} очков и ${this.coins} монет! Попробуй побить мой рекорд!`)}`;
+
+                if (tgApp.openLink) {
+                    tgApp.openLink(shareUrl);
+                } else {
+                    window.open(shareUrl, '_blank');
+                }
+            }
+        }
     }
 
     checkForUpgrades() {
@@ -128,6 +235,24 @@ class GameOverScene extends Phaser.Scene {
                     }
                 });
             });
+
+            // Интеграция с MainButton Telegram
+            if (tgApp && tgApp.MainButton) {
+                upgradeButton.on('pointerover', () => {
+                    tgApp.MainButton.setText('УЛУЧШЕНИЯ');
+                    tgApp.MainButton.show();
+                    tgApp.MainButton.onClick(() => {
+                        this.scene.start('MenuScene');
+                        // Вызов меню улучшений через событие
+                        this.time.delayedCall(100, () => {
+                            const menuScene = this.scene.get('MenuScene');
+                            if (menuScene && menuScene.openUpgradeMenu) {
+                                menuScene.openUpgradeMenu();
+                            }
+                        });
+                    });
+                });
+            }
         }
     }
 }

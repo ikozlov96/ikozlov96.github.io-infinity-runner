@@ -8,6 +8,20 @@ class GameScene extends Phaser.Scene {
         this.gameData = this.registry.get('gameData');
         this.physicsConstants = this.registry.get('physicsConstants');
 
+        // Настройка кнопок Telegram
+        if (tgApp) {
+            if (tgApp.MainButton) tgApp.MainButton.hide();
+            if (tgApp.BackButton) {
+                tgApp.BackButton.show();
+                tgApp.BackButton.onClick(() => {
+                    this.scene.start('MenuScene');
+                });
+            }
+
+            // Устанавливаем текущую сцену для системы навигации
+            this.registry.set('currentScene', 'GameScene');
+        }
+
         // Сброс счета для новой игры
         this.score = 0;
         this.collectedCoins = 0;
@@ -31,8 +45,7 @@ class GameScene extends Phaser.Scene {
         // Создание игрока
         this.player = new Player(this, 150, this.cameras.main.height - 150);
 
-        // УДАЛЕНО: вызов метода logPhysicalStats, который больше не существует
-        // Вместо этого просто логгируем основные параметры
+        // Логирование физических параметров
         console.log("Физические параметры: Гравитация =", this.physics.world.gravity.y);
 
         // Коллизия игрока с землей
@@ -83,6 +96,109 @@ class GameScene extends Phaser.Scene {
         // Добавляем отслеживание времени для плавного изменения скорости
         this.lastTime = 0;
         this.deltaTime = 0;
+
+        // Добавляем паузу при потере фокуса окна или свернутом приложении
+        this.scene.game.events.on('blur', () => {
+            if (!this.gameOver) this.pauseGame();
+        });
+
+        // Добавляем кнопку паузы
+        this.pauseButton = this.add.rectangle(
+            this.cameras.main.width - 30,
+            30,
+            40,
+            40,
+            0x333333
+        ).setInteractive();
+
+        this.add.text(this.cameras.main.width - 30, 30, '⏸️', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '20px',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.pauseButton.on('pointerdown', () => {
+            this.pauseGame();
+        });
+    }
+
+    pauseGame() {
+        this.physics.pause();
+        this.obstacleTimer.paused = true;
+        this.coinTimer.paused = true;
+        this.difficultyTimer.paused = true;
+
+        // Показываем кнопку продолжить в Telegram
+        if (tgApp && tgApp.MainButton) {
+            tgApp.MainButton.setText('ПРОДОЛЖИТЬ');
+            tgApp.MainButton.show();
+            tgApp.MainButton.onClick(() => {
+                this.resumeGame();
+            });
+        }
+
+        // Затемнение экрана и сообщение о паузе
+        this.pauseOverlay = this.add.rectangle(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000,
+            0.7
+        );
+
+        this.pauseText = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            'ПАУЗА',
+            {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '48px',
+                color: '#ffffff'
+            }
+        ).setOrigin(0.5);
+
+        // Кнопка продолжить
+        this.resumeButton = this.add.rectangle(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2 + 80,
+            200,
+            60,
+            0x4285F4
+        ).setInteractive();
+
+        this.resumeText = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2 + 80,
+            'ПРОДОЛЖИТЬ',
+            {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '24px',
+                color: '#ffffff'
+            }
+        ).setOrigin(0.5);
+
+        this.resumeButton.on('pointerdown', () => {
+            this.resumeGame();
+        });
+    }
+
+    resumeGame() {
+        this.physics.resume();
+        this.obstacleTimer.paused = false;
+        this.coinTimer.paused = false;
+        this.difficultyTimer.paused = false;
+
+        // Скрываем кнопку в Telegram
+        if (tgApp && tgApp.MainButton) {
+            tgApp.MainButton.hide();
+        }
+
+        // Удаляем элементы паузы
+        if (this.pauseOverlay) this.pauseOverlay.destroy();
+        if (this.pauseText) this.pauseText.destroy();
+        if (this.resumeButton) this.resumeButton.destroy();
+        if (this.resumeText) this.resumeText.destroy();
     }
 
     update(time) {
@@ -123,6 +239,11 @@ class GameScene extends Phaser.Scene {
 
                 this.collectedCoins += coinValue;
                 this.coinText.setText(`Монеты: ${this.collectedCoins}`);
+
+                // Эффект сбора монеты - вибрация в Telegram
+                if (tgApp && tgApp.HapticFeedback) {
+                    tgApp.HapticFeedback.impactOccurred('light');
+                }
             }
         }
 
@@ -202,6 +323,11 @@ class GameScene extends Phaser.Scene {
         this.obstacleTimer.remove();
         this.coinTimer.remove();
         this.difficultyTimer.remove();
+
+        // Вибрация при проигрыше в Telegram
+        if (tgApp && tgApp.HapticFeedback) {
+            tgApp.HapticFeedback.notificationOccurred('error');
+        }
 
         // Анимация смерти игрока
         this.player.die();
