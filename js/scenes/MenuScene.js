@@ -1,19 +1,23 @@
 class MenuScene extends Phaser.Scene {
     constructor() {
-        super({ key: 'MenuScene' });
+        super({key: 'MenuScene'});
     }
 
     create() {
         // Получаем данные игры из реестра
         this.gameData = this.registry.get('gameData');
 
-        // Скрываем кнопки Telegram в начале сцены
-        if (tgApp) {
-            if (tgApp.MainButton) tgApp.MainButton.hide();
-            if (tgApp.BackButton) tgApp.BackButton.hide();
+        // Устанавливаем текущую сцену для системы навигации
+        this.registry.set('currentScene', 'MenuScene');
 
-            // Устанавливаем текущую сцену для системы навигации
-            this.registry.set('currentScene', 'MenuScene');
+        // ИСПРАВЛЕНО: Удалено скрытие кнопок - пусть Telegram сам управляет ими
+        // Вместо этого, ДОБАВЛЯЕМ обработчик нажатия на нативную кнопку ИГРАТЬ
+        if (tgApp && tgApp.MainButton) {
+            tgApp.MainButton.setText('ИГРАТЬ');
+            tgApp.MainButton.show();
+            tgApp.MainButton.onClick(() => {
+                this.scene.start('GameScene');
+            });
         }
 
         // Фон
@@ -63,20 +67,8 @@ class MenuScene extends Phaser.Scene {
             this.scene.start('GameScene');
         });
 
-        // Интеграция с MainButton Telegram
-        if (tgApp && tgApp.MainButton) {
-            playButton.on('pointerover', () => {
-                tgApp.MainButton.setText('ИГРАТЬ');
-                tgApp.MainButton.show();
-                tgApp.MainButton.onClick(() => {
-                    this.scene.start('GameScene');
-                });
-            });
-
-            playButton.on('pointerout', () => {
-                tgApp.MainButton.hide();
-            });
-        }
+        // ИСПРАВЛЕНО: Убрали события pointerover/pointerout, чтобы избежать конфликтов
+        // Теперь MainButton всегда отображается и работает параллельно с игровой кнопкой
 
         // Кнопка улучшений
         const upgradeButton = this.add.rectangle(
@@ -97,17 +89,6 @@ class MenuScene extends Phaser.Scene {
         upgradeButton.on('pointerdown', () => {
             this.openUpgradeMenu();
         });
-
-        // Интеграция кнопки улучшений с Telegram
-        if (tgApp && tgApp.MainButton) {
-            upgradeButton.on('pointerover', () => {
-                tgApp.MainButton.setText('УЛУЧШЕНИЯ');
-                tgApp.MainButton.show();
-                tgApp.MainButton.onClick(() => {
-                    this.openUpgradeMenu();
-                });
-            });
-        }
     }
 
     openUpgradeMenu() {
@@ -118,10 +99,11 @@ class MenuScene extends Phaser.Scene {
             }
         });
 
-        // Показываем кнопку "Назад" в Telegram, если мы в меню улучшений
-        if (tgApp && tgApp.BackButton) {
-            tgApp.BackButton.show();
-            tgApp.BackButton.onClick(() => {
+        // ИСПРАВЛЕНО: Меняем кнопку MainButton на "НАЗАД" в меню улучшений
+        if (tgApp && tgApp.MainButton) {
+            tgApp.MainButton.setText('НАЗАД');
+            tgApp.MainButton.show();
+            tgApp.MainButton.onClick(() => {
                 this.scene.restart();
             });
         }
@@ -187,21 +169,6 @@ class MenuScene extends Phaser.Scene {
         backButton.on('pointerdown', () => {
             this.scene.restart(); // Перезапускаем сцену для возврата в главное меню
         });
-
-        // Интеграция с кнопками Telegram
-        if (tgApp && tgApp.MainButton) {
-            backButton.on('pointerover', () => {
-                tgApp.MainButton.setText('НАЗАД');
-                tgApp.MainButton.show();
-                tgApp.MainButton.onClick(() => {
-                    this.scene.restart();
-                });
-            });
-
-            backButton.on('pointerout', () => {
-                tgApp.MainButton.hide();
-            });
-        }
     }
 
     createUpgradeItem(y, name, level, maxLevel, cost, onUpgrade) {
@@ -255,19 +222,6 @@ class MenuScene extends Phaser.Scene {
             // Обработчик нажатия на кнопку улучшения
             if (this.gameData.coins >= cost) {
                 upgradeButton.on('pointerdown', onUpgrade);
-
-                // Интеграция с кнопками Telegram для улучшений
-                if (tgApp && tgApp.MainButton) {
-                    upgradeButton.on('pointerover', () => {
-                        tgApp.MainButton.setText(`УЛУЧШИТЬ ${name}`);
-                        tgApp.MainButton.show();
-                        tgApp.MainButton.onClick(onUpgrade);
-                    });
-
-                    upgradeButton.on('pointerout', () => {
-                        tgApp.MainButton.hide();
-                    });
-                }
             }
         } else {
             // Если улучшение на максимуме

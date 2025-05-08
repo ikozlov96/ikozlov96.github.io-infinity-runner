@@ -2,7 +2,9 @@
 let tgApp;
 try {
     tgApp = window.Telegram.WebApp;
-    tgApp.expand(); // Расширяем на весь экран
+    // ИСПРАВЛЕНО: Принудительно расширяем на весь экран и ждем готовности
+    tgApp.expand();
+    tgApp.ready();
     console.log('Telegram WebApp инициализирован');
 } catch (e) {
     console.log('Telegram WebApp не обнаружен, запуск в обычном режиме');
@@ -13,6 +15,7 @@ if (!window.Telegram) {
     window.Telegram = {
         WebApp: {
             expand: () => console.log('Заглушка для Telegram.WebApp.expand'),
+            ready: () => console.log('Заглушка для Telegram.WebApp.ready'),
             isExpanded: true,
             CloudStorage: null,
             MainButton: {
@@ -31,7 +34,6 @@ if (!window.Telegram) {
 }
 
 // Функция инициализации пользователя Telegram
-// Перемещена перед использованием в gameData
 function initTelegramUser() {
     if (tgApp && tgApp.initDataUnsafe) {
         const user = tgApp.initDataUnsafe.user;
@@ -44,16 +46,37 @@ function initTelegramUser() {
     return 'local_user'; // Для локального тестирования
 }
 
+// ИСПРАВЛЕНО: Получаем текущую ширину и высоту окна для правильного масштабирования
+const getWindowSize = () => {
+    if (tgApp) {
+        // Для Telegram берем размеры из viewport
+        const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const viewportHeight = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+        return { width: viewportWidth, height: viewportHeight };
+    } else {
+        // Для обычного браузера
+        return { width: 800, height: 600 };
+    }
+};
+
+// ИСПРАВЛЕНО: Используем динамическое определение размеров
+const windowSize = getWindowSize();
+
 // Конфигурация игры с использованием физических констант
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    // ИСПРАВЛЕНО: Используем размер окна для canvas
+    width: windowSize.width,
+    height: windowSize.height,
     parent: 'game-container',
+    // ИСПРАВЛЕНО: Добавляем scale mode для лучшего масштабирования
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'arcade',
         arcade: {
-            // Используем гравитацию из физических констант
             gravity: {y: PhysicsConstants.WORLD.GRAVITY},
             debug: false
         }
@@ -148,59 +171,30 @@ const gameData = {
 
 // Инициализация игры при загрузке страницы
 window.addEventListener('load', () => {
-    // Загружаем сохраненный прогресс
-    gameData.loadProgress();
+    // ИСПРАВЛЕНО: Добавляем небольшую задержку, чтобы убедиться, что Telegram.WebApp полностью инициализирован
+    setTimeout(() => {
+        // Загружаем сохраненный прогресс
+        gameData.loadProgress();
 
-    // Создаем игру
-    const game = new Phaser.Game(config);
+        // Создаем игру
+        const game = new Phaser.Game(config);
 
-    // Делаем глобальные данные доступными для сцен
-    game.registry.set('gameData', gameData);
-    game.registry.set('physicsConstants', PhysicsConstants);
+        // Делаем глобальные данные доступными для сцен
+        game.registry.set('gameData', gameData);
+        game.registry.set('physicsConstants', PhysicsConstants);
 
-    // Настройка кнопки "Назад" в Telegram
-    if (tgApp && tgApp.BackButton) {
-        tgApp.BackButton.hide(); // По умолчанию скрыта
-
-        // Слушатель события по изменению сцены
-        game.events.on('changedata-currentScene', (parent, value) => {
-            if (value === 'MenuScene') {
-                tgApp.BackButton.hide();
-            } else {
-                tgApp.BackButton.show();
-                tgApp.BackButton.onClick(() => {
-                    game.scene.start('MenuScene');
-                });
-            }
+        // ИСПРАВЛЕНО: Обрабатываем изменение размера окна для адаптивности
+        window.addEventListener('resize', () => {
+            // Автоматически обрабатывается Phaser.Scale.RESIZE
+            console.log('Размер окна изменен');
         });
-    }
 
-    // Обработчик изменения размера окна
-    window.addEventListener('resize', () => {
-        resizeGame(game);
-    });
-
-    // Начальное изменение размера
-    resizeGame(game);
+        // ИСПРАВЛЕНО: Для мобильных устройств добавляем обработчик ориентации
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                // Даем время на перерисовку после изменения ориентации
+                game.scale.refresh();
+            }, 200);
+        });
+    }, 100);
 });
-
-// Функция для адаптивности игры
-function resizeGame(game) {
-    const container = document.getElementById('game-container');
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    const aspectRatio = config.width / config.height;
-    let newWidth, newHeight;
-
-    if (containerWidth / containerHeight > aspectRatio) {
-        newHeight = containerHeight;
-        newWidth = newHeight * aspectRatio;
-    } else {
-        newWidth = containerWidth;
-        newHeight = newWidth / aspectRatio;
-    }
-
-    game.scale.resize(newWidth, newHeight);
-    game.scale.setZoom(newWidth / config.width);
-}
