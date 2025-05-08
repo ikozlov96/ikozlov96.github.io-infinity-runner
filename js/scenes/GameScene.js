@@ -97,8 +97,9 @@ class GameScene extends Phaser.Scene {
         this.lastTime = 0;
         this.deltaTime = 0;
 
-        // Добавляем паузу при потере фокуса окна или свернутом приложении
-        this.scene.game.events.on('blur', () => {
+        // ИСПРАВЛЕНО: Используем правильный способ обработки события потери фокуса
+        // Вместо this.scene.game.events используем window и собственный обработчик
+        window.addEventListener('blur', () => {
             if (!this.gameOver) this.pauseGame();
         });
 
@@ -123,82 +124,90 @@ class GameScene extends Phaser.Scene {
     }
 
     pauseGame() {
-        this.physics.pause();
-        this.obstacleTimer.paused = true;
-        this.coinTimer.paused = true;
-        this.difficultyTimer.paused = true;
+        // Добавляем проверку, чтобы избежать ошибок
+        if (this.physics && !this.gameOver) {
+            this.physics.pause();
 
-        // Показываем кнопку продолжить в Telegram
-        if (tgApp && tgApp.MainButton) {
-            tgApp.MainButton.setText('ПРОДОЛЖИТЬ');
-            tgApp.MainButton.show();
-            tgApp.MainButton.onClick(() => {
+            if (this.obstacleTimer) this.obstacleTimer.paused = true;
+            if (this.coinTimer) this.coinTimer.paused = true;
+            if (this.difficultyTimer) this.difficultyTimer.paused = true;
+
+            // Показываем кнопку продолжить в Telegram
+            if (tgApp && tgApp.MainButton) {
+                tgApp.MainButton.setText('ПРОДОЛЖИТЬ');
+                tgApp.MainButton.show();
+                tgApp.MainButton.onClick(() => {
+                    this.resumeGame();
+                });
+            }
+
+            // Затемнение экрана и сообщение о паузе
+            this.pauseOverlay = this.add.rectangle(
+                this.cameras.main.width / 2,
+                this.cameras.main.height / 2,
+                this.cameras.main.width,
+                this.cameras.main.height,
+                0x000000,
+                0.7
+            );
+
+            this.pauseText = this.add.text(
+                this.cameras.main.width / 2,
+                this.cameras.main.height / 2,
+                'ПАУЗА',
+                {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '48px',
+                    color: '#ffffff'
+                }
+            ).setOrigin(0.5);
+
+            // Кнопка продолжить
+            this.resumeButton = this.add.rectangle(
+                this.cameras.main.width / 2,
+                this.cameras.main.height / 2 + 80,
+                200,
+                60,
+                0x4285F4
+            ).setInteractive();
+
+            this.resumeText = this.add.text(
+                this.cameras.main.width / 2,
+                this.cameras.main.height / 2 + 80,
+                'ПРОДОЛЖИТЬ',
+                {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '24px',
+                    color: '#ffffff'
+                }
+            ).setOrigin(0.5);
+
+            this.resumeButton.on('pointerdown', () => {
                 this.resumeGame();
             });
         }
-
-        // Затемнение экрана и сообщение о паузе
-        this.pauseOverlay = this.add.rectangle(
-            this.cameras.main.width / 2,
-            this.cameras.main.height / 2,
-            this.cameras.main.width,
-            this.cameras.main.height,
-            0x000000,
-            0.7
-        );
-
-        this.pauseText = this.add.text(
-            this.cameras.main.width / 2,
-            this.cameras.main.height / 2,
-            'ПАУЗА',
-            {
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '48px',
-                color: '#ffffff'
-            }
-        ).setOrigin(0.5);
-
-        // Кнопка продолжить
-        this.resumeButton = this.add.rectangle(
-            this.cameras.main.width / 2,
-            this.cameras.main.height / 2 + 80,
-            200,
-            60,
-            0x4285F4
-        ).setInteractive();
-
-        this.resumeText = this.add.text(
-            this.cameras.main.width / 2,
-            this.cameras.main.height / 2 + 80,
-            'ПРОДОЛЖИТЬ',
-            {
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '24px',
-                color: '#ffffff'
-            }
-        ).setOrigin(0.5);
-
-        this.resumeButton.on('pointerdown', () => {
-            this.resumeGame();
-        });
     }
 
     resumeGame() {
-        this.physics.resume();
-        this.obstacleTimer.paused = false;
-        this.coinTimer.paused = false;
-        this.difficultyTimer.paused = false;
+        // Добавляем проверки, чтобы избежать ошибок
+        if (this.physics) {
+            this.physics.resume();
 
-        // Скрываем кнопку в Telegram
-        if (tgApp && tgApp.MainButton) {
-            tgApp.MainButton.hide();
+            if (this.obstacleTimer) this.obstacleTimer.paused = false;
+            if (this.coinTimer) this.coinTimer.paused = false;
+            if (this.difficultyTimer) this.difficultyTimer.paused = false;
+
+            // Скрываем кнопку в Telegram
+            if (tgApp && tgApp.MainButton) {
+                tgApp.MainButton.hide();
+            }
+
+            // Удаляем элементы паузы
+            if (this.pauseOverlay) this.pauseOverlay.destroy();
+            if (this.pauseText) this.pauseText.destroy();
+            if (this.resumeButton) this.resumeButton.destroy();
+            if (this.resumeText) this.resumeText.destroy();
         }
-
-        // Удаляем элементы паузы
-        if (this.pauseOverlay) this.pauseOverlay.destroy();
-        if (this.pauseText) this.pauseText.destroy();
-        if (this.resumeButton) this.resumeButton.destroy();
-        if (this.resumeText) this.resumeText.destroy();
     }
 
     update(time) {
