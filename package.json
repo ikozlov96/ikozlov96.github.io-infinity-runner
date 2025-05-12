@@ -1,13 +1,20 @@
 {
-  "name": "mini-game",
+  "name": "infinity-runner-telegram-game",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Infinity Runner - игра для Telegram Gaming Platform",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "telegraf": "^4.14.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
 }

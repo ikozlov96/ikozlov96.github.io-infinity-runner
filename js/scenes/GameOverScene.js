@@ -189,19 +189,19 @@ class GameOverScene extends Phaser.Scene {
 
     shareResult() {
         if (tgApp) {
-            if (tgApp.switchInlineQuery) {
-                // Для ботов, поддерживающих inline режим
-                const shareText = `Мой результат в Infinity Runner: ${this.score} очков и ${this.coins} монет! Попробуй побить мой рекорд!`;
-                tgApp.switchInlineQuery(shareText, ['users', 'groups', 'channels']);
-            } else {
-                // Альтернативный вариант - открыть диалог шаринга
-                const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`Мой результат в Infinity Runner: ${this.score} очков и ${this.coins} монет! Попробуй побить мой рекорд!`)}`;
+            // Отправка счета в Telegram Games API
+            if (window.TelegramGameProxy) {
+                window.TelegramGameProxy.shareScore();
+            }
 
-                if (tgApp.openLink) {
-                    tgApp.openLink(shareUrl);
-                } else {
-                    window.open(shareUrl, '_blank');
-                }
+            // Отправка результата в Telegram Mini Apps API
+            if (tgApp.sendData) {
+                const gameResult = JSON.stringify({
+                    score: this.score,
+                    coins: this.coins,
+                    type: 'game_result'
+                });
+                tgApp.sendData(gameResult);
             }
         }
     }

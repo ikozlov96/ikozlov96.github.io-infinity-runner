@@ -35,14 +35,25 @@ if (!window.Telegram) {
 
 // Функция инициализации пользователя Telegram
 function initTelegramUser() {
+    // Проверяем параметры URL для случаев, когда игра запускается из Telegram Games
+    const urlParams = new URLSearchParams(window.location.search);
+    const tgParamUserId = urlParams.get('user_id') || urlParams.get('id');
+
+    // Если есть параметры в URL, используем их
+    if (tgParamUserId) {
+        console.log(`Telegram Game User ID from URL: ${tgParamUserId}`);
+        return tgParamUserId;
+    }
+
+    // Иначе пытаемся получить из WebApp
     if (tgApp && tgApp.initDataUnsafe) {
         const user = tgApp.initDataUnsafe.user;
         if (user) {
-            // Можно сохранять прогресс под ID пользователя
             console.log(`Telegram User: ${user.first_name} (ID: ${user.id})`);
             return user.id;
         }
     }
+
     return 'local_user'; // Для локального тестирования
 }
 
@@ -182,6 +193,24 @@ window.addEventListener('load', () => {
         // Делаем глобальные данные доступными для сцен
         game.registry.set('gameData', gameData);
         game.registry.set('physicsConstants', PhysicsConstants);
+
+        // Передача высокого счета в Telegram Game
+        window.TelegramGameProxy = {
+            shareScore: function() {
+                if (window.TelegramGameProxy && gameData.highScore > 0) {
+                    window.TelegramGameProxy.postEvent('SCORE', gameData.highScore);
+                    console.log('Score sent to Telegram:', gameData.highScore);
+                }
+            }
+        };
+
+        // Добавляем обработчик сообщений от Telegram Games API
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.eventName === 'SCORE') {
+                gameData.highScore = Math.max(gameData.highScore, e.data.eventData);
+                gameData.saveProgress();
+            }
+        });
 
         // ИСПРАВЛЕНО: Обрабатываем изменение размера окна для адаптивности
         window.addEventListener('resize', () => {
